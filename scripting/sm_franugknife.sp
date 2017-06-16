@@ -29,7 +29,7 @@
 
 #define MAX_KNIVES 50 //Not sure how many knives will eventually be in the game until its death.
 
-#define DATA "3.0.5 private version"
+#define DATA "3.0.6 private version"
 
 enum KnifeList{
 	String:Name[64],
@@ -131,12 +131,8 @@ public int DIDMenuHandler_h(Menu menu, MenuAction action, int client, int itemNu
 			SetClientCookie(client, c_knife, cookie);
 		
 			if (knife[client] < 0 || knife[client] > (MAX_KNIVES - 1))knife[client] = 0;
-			if(knives[knife[client]][KnifeID] > -1)
-			{
-				if(IsPlayerAlive(client)) GiveNamedItem_GiveKnife(client, knives[knife[client]][KnifeID]);
-				
-			}
-			else DarKnife(client);
+			
+			GiveNamedItem_GiveKnife(client, knives[knife[client]][KnifeID]);
 		
 			loadKnifeMenu(client, GetMenuSelectionPosition());
 		}
@@ -160,18 +156,6 @@ public void OnClientCookiesCached(int client) {
 	GetClientCookie(client, c_knife, value, sizeof(value));
 	if(strlen(value) > 0) knife[client] = StringToInt(value);
 	else knife[client] = 0;
-}
-
-public void DarKnife(int client) {
-	if(!IsPlayerAlive(client)) return;
-	
-	int iWeapon = GetPlayerWeaponSlot(client, CS_SLOT_KNIFE);
-	if (iWeapon != -1) {
-		RemovePlayerItem(client, iWeapon);
-		AcceptEntityInput(iWeapon, "Kill");
-		
-		GivePlayerItem(client, "weapon_knife");
-	}
 }
 
 public void loadKnives() {
