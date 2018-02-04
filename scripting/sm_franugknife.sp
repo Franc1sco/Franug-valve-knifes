@@ -24,12 +24,14 @@
 #include <clientprefs>
 #include <weapons>
 #include <givenameditem>
+#undef REQUIRE_PLUGIN
+#include <fpvm_interface>
 
 #pragma semicolon 1
 
 #define MAX_KNIVES 50 //Not sure how many knives will eventually be in the game until its death.
 
-#define DATA "3.0.6 private version"
+#define DATA "3.1 private version"
 
 enum KnifeList{
 	String:Name[64],
@@ -58,6 +60,7 @@ Handle c_knife;
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	CreateNative("Franug_GetKnife", Native_GetKnife);
+	MarkNativeAsOptional("FPVMI_GetClientViewModel");
 	return APLRes_Success;
 }
 
@@ -72,7 +75,8 @@ public Native_GetKnife(Handle:plugin, params)
 public void OnPluginStart() {
 	c_knife = RegClientCookie("hknife3", "", CookieAccess_Private);
 	
-	RegConsoleCmd("sm_knife", DID);
+	RegConsoleCmd("sm_knife", command_knives);
+	RegConsoleCmd("sm_vknife", DID);
 	
 	for (int i = 1; i <= MaxClients; i++) {
 		if (IsClientInGame(i) && !IsFakeClient(i) && AreClientCookiesCached(i)) {
@@ -88,7 +92,45 @@ public Action DID(int clientId, int args) {
 	return Plugin_Handled;
 }
 
-public void loadKnifeMenu(int clientId, int menuPosition) {
+public Action command_knives(int clientId, int args) {
+	if(!CommandExists("sm_ck"))
+	{
+		FakeClientCommand(clientId, "sm_vknife");
+		return Plugin_Handled;
+	}
+	
+	Menu menu = CreateMenu(DIDMenuHandler_knives);
+	menu.SetTitle("Franug knives %s", DATA);
+	
+
+	menu.AddItem("sm_vknife", "Valve knives");
+	menu.AddItem("sm_ck", "Custom knives");
+	
+	SetMenuExitButton(menu, true);
+	
+	menu.Display(clientId, 0);
+	
+	return Plugin_Handled;
+	
+}
+
+public int DIDMenuHandler_knives(Menu menu, MenuAction action, int client, int itemNum) {
+	switch(action){
+		case MenuAction_Select:{
+			
+			char info[32];
+		
+			menu.GetItem(itemNum, info, sizeof(info));
+
+			FakeClientCommand(client, info);
+		}
+		case MenuAction_End: delete menu;
+	}
+}
+
+public void loadKnifeMenu(int clientId, int menuPosition) 
+{
+	
 	Menu menu = CreateMenu(DIDMenuHandler_h);
 	menu.SetTitle("Franug Knife %s\nChoose you knife.", DATA);
 	
@@ -146,6 +188,8 @@ public OnGiveNamedItemEx(int client, const char[] Classname)
 	if(GiveNamedItemEx.IsClassnameKnife(Classname))
 	{
 		if (knife[client] < 0 || knife[client] > (MAX_KNIVES - 1))return;
+		
+		if ((GetFeatureStatus(FeatureType_Native, "FPVMI_GetClientViewModel") == FeatureStatus_Available) && FPVMI_GetClientViewModel(client, "weapon_knife") != -1) return;
 		
 		if(knives[knife[client]][KnifeID] > -1) GiveNamedItemEx.ItemDefinition = knives[knife[client]][KnifeID];
 	}
