@@ -10,3 +10,8 @@
 * You dont need to upload the .sp file
 * If you want a !ws plugin you need to use the private ws version, if you still dont have it, then buy it from me (Franc1sco franug)
 * Configure addons/sourcemod/configs/csgo_knives.cfg
+
+
+### Optional
+
+* Compatible with https://forums.alliedmods.net/showthread.php?t=276733
