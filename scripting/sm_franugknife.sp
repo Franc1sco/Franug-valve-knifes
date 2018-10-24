@@ -31,7 +31,7 @@
 
 #define MAX_KNIVES 50 //Not sure how many knives will eventually be in the game until its death.
 
-#define DATA "3.1 private version"
+#define DATA "4.0 private version"
 
 enum KnifeList{
 	String:Name[64],
@@ -43,6 +43,7 @@ ArrayList KnivesArray;
 char path_knives[PLATFORM_MAX_PATH];
 knives[MAX_KNIVES][KnifeList];
 int knifeCount = 0;
+int g_team[MAXPLAYERS + 1];
 
 
 public Plugin myinfo = {
@@ -53,9 +54,10 @@ public Plugin myinfo = {
 	url = "http://steamcommunity.com/id/franug"
 };
 
-int knife[MAXPLAYERS+1];
+int knife_ct[MAXPLAYERS+1];
+int knife_t[MAXPLAYERS+1];
 
-Handle c_knife;
+Handle c_knife_ct, c_knife_t;
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
@@ -67,13 +69,21 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public Native_GetKnife(Handle:plugin, params)
 {
 	int client = GetNativeCell(1);
-	if (knife[client] < 0 || knife[client] > (MAX_KNIVES - 1))return -1;
+	int knife;
+	if(GetClientTeam(client) == CS_TEAM_CT)
+		knife = knife_ct[client];
+	else
+		knife = knife_t[client];
 	
-	return knives[knife[client]][KnifeID];
+	if (knife < 0 || knife > (MAX_KNIVES - 1))return -1;
+	
+	return knives[knife][KnifeID];
 }
 
 public void OnPluginStart() {
-	c_knife = RegClientCookie("hknife3", "", CookieAccess_Private);
+	
+	c_knife_ct = RegClientCookie("hknife_ct", "", CookieAccess_Private);
+	c_knife_t = RegClientCookie("hknife_t", "", CookieAccess_Private);
 	
 	RegConsoleCmd("sm_knife", command_knives);
 	RegConsoleCmd("sm_vknife", DID);
@@ -85,11 +95,6 @@ public void OnPluginStart() {
 	}
 	KnivesArray = new ArrayList(64);
 	loadKnives();
-}
-
-public Action DID(int clientId, int args) {
-	loadKnifeMenu(clientId, -1);
-	return Plugin_Handled;
 }
 
 public Action command_knives(int clientId, int args) {
@@ -128,16 +133,60 @@ public int DIDMenuHandler_knives(Menu menu, MenuAction action, int client, int i
 	}
 }
 
+public Action:DID(clientId, args) 
+{
+	new Handle:menu = CreateMenu(DIDMenuHandler);
+	SetMenuTitle(menu, "Choose a category");
+	AddMenuItem(menu, "ct", "Select counter-terrorist knife");
+	AddMenuItem(menu, "tt", "Select terrorist knife");
+	SetMenuExitButton(menu, true);
+	DisplayMenu(menu, clientId, 0);
+	
+	return Plugin_Handled;
+}
+
+public DIDMenuHandler(Handle:menu, MenuAction:action, client, itemNum) 
+{
+	if ( action == MenuAction_Select ) 
+	{
+		new String:info[32];
+		
+		GetMenuItem(menu, itemNum, info, sizeof(info));
+
+		if ( strcmp(info,"ct") == 0 ) 
+		{     
+			loadKnifeMenu(client, -1);
+			g_team[client] = CS_TEAM_CT;
+		}
+	   
+		else if ( strcmp(info,"tt") == 0 ) 
+		{
+			loadKnifeMenu(client, -1);
+			g_team[client] = CS_TEAM_T;
+		}
+	}
+	else if (action == MenuAction_End)
+	{
+		CloseHandle(menu);
+	}
+}
+
 public void loadKnifeMenu(int clientId, int menuPosition) 
 {
 	
 	Menu menu = CreateMenu(DIDMenuHandler_h);
 	menu.SetTitle("Franug Knife %s\nChoose you knife.", DATA);
 	
+	int knife;
+	if(g_team[clientId] == CS_TEAM_CT)
+		knife = knife_ct[clientId];
+	else
+		knife = knife_t[clientId];
+		
 	char item[4], item2[124];
 	for (int i = 0; i < knifeCount; ++i) {
 		Format(item, 4, "%i", i);
-		if(knife[clientId] == i)
+		if(knife == i)
 		{
 			Format(item2, 124, "%s (Current knife)", knives[i][Name]);
 			menu.AddItem(item, item2, ITEMDRAW_DISABLED);
@@ -166,17 +215,36 @@ public int DIDMenuHandler_h(Menu menu, MenuAction action, int client, int itemNu
 		
 			menu.GetItem(itemNum, info, sizeof(info));
 
-			knife[client] = StringToInt(info);
+			if(g_team[client] == CS_TEAM_T)
+			{
+				knife_t[client] = StringToInt(info);
 		
-			char cookie[8];
-			IntToString(knife[client], cookie, 8);
-			SetClientCookie(client, c_knife, cookie);
-		
-			if (knife[client] < 0 || knife[client] > (MAX_KNIVES - 1))knife[client] = 0;
+				char cookie[8];
+				IntToString(knife_t[client], cookie, 8);
 			
-			GiveNamedItem_GiveKnife(client, knives[knife[client]][KnifeID]);
+				SetClientCookie(client, c_knife_t, cookie);
 		
-			loadKnifeMenu(client, GetMenuSelectionPosition());
+				if (knife_t[client] < 0 || knife_t[client] > (MAX_KNIVES - 1))knife_t[client] = 0;
+			
+				GiveNamedItem_GiveKnife(client, knives[knife_t[client]][KnifeID]);
+		
+				loadKnifeMenu(client, GetMenuSelectionPosition());
+			}
+			if(g_team[client] == CS_TEAM_CT)
+			{
+				knife_ct[client] = StringToInt(info);
+		
+				char cookie[8];
+				IntToString(knife_ct[client], cookie, 8);
+			
+				SetClientCookie(client, c_knife_ct, cookie);
+		
+				if (knife_ct[client] < 0 || knife_ct[client] > (MAX_KNIVES - 1))knife_ct[client] = 0;
+			
+				GiveNamedItem_GiveKnife(client, knives[knife_ct[client]][KnifeID]);
+		
+				loadKnifeMenu(client, GetMenuSelectionPosition());
+			}
 		}
 		case MenuAction_End: delete menu;
 	}
@@ -187,19 +255,30 @@ public OnGiveNamedItemEx(int client, const char[] Classname)
 	
 	if(GiveNamedItemEx.IsClassnameKnife(Classname))
 	{
-		if (knife[client] < 0 || knife[client] > (MAX_KNIVES - 1))return;
+		int knife;
+		if(GetClientTeam(client) == CS_TEAM_CT)
+			knife = knife_ct[client];
+		else
+			knife = knife_t[client];
+			
+		if (knife < 0 || knife > (MAX_KNIVES - 1))return;
 		
 		if ((GetFeatureStatus(FeatureType_Native, "FPVMI_GetClientViewModel") == FeatureStatus_Available) && FPVMI_GetClientViewModel(client, "weapon_knife") != -1) return;
 		
-		if(knives[knife[client]][KnifeID] > -1) GiveNamedItemEx.ItemDefinition = knives[knife[client]][KnifeID];
+		if(knives[knife][KnifeID] > -1) GiveNamedItemEx.ItemDefinition = knives[knife][KnifeID];
 	}
 }
 
 public void OnClientCookiesCached(int client) {
 	char value[16];
-	GetClientCookie(client, c_knife, value, sizeof(value));
-	if(strlen(value) > 0) knife[client] = StringToInt(value);
-	else knife[client] = 0;
+	GetClientCookie(client, c_knife_ct, value, sizeof(value));
+	if(strlen(value) > 0) knife_ct[client] = StringToInt(value);
+	else knife_ct[client] = 0;
+	
+
+	GetClientCookie(client, c_knife_t, value, sizeof(value));
+	if(strlen(value) > 0) knife_t[client] = StringToInt(value);
+	else knife_t[client] = 0;
 }
 
 public void loadKnives() {
